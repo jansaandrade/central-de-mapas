@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Mapas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: prático, direto, de balcão de expedição — frases curtas, botões grandes.
+   IDEA: o chat se comporta como o canhoto de um mapa de entrega: cada resposta do bot é um "papel" carimbado.
+   PICTURE: a própria conversa ocupa a tela; a equipe aparece como um cartão-canhoto com mapa, placa e nomes.
+   COLOUR and TYPE: verde-petróleo escuro no cabeçalho, papel kraft no fundo, coral só nos botões e alertas; Figtree.
+   LAYOUT: coluna única de celular (máx. 560px), cabeçalho fixo, conversa rolando, barra de digitação embaixo. */
+:root{color-scheme:light dark;
+ --bg:light-dark(#ece7df,#12181a);--paper:light-dark(#ffffff,#1d2528);--ink:light-dark(#1b2326,#e9eeee);
+ --mut:light-dark(#5f6b6e,#9aa7aa);--line:light-dark(#d8d1c5,#2c3639);--head:light-dark(#0f4c4a,#0b3634);
+ --me:light-dark(#d6ede6,#1f3d38);--acc:#ef5b3b;--accd:light-dark(#c8401f,#ff7a5c);--ok:light-dark(#1f7a4d,#5fd39a);--warn:light-dark(#a35a00,#ffb44d)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Figtree,system-ui,sans-serif;overflow-x:clip}
+.app{max-width:560px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;background:var(--bg);border-inline:1px solid var(--line)}
+header{background:var(--head);color:#fff;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;flex:none;border-radius:50%;background:#fff1;display:grid;place-items:center}
+header h1{font-size:17px;line-height:1.2;margin:0;font-weight:700}
+header p{margin:0;font-size:13px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5fe39a;margin-right:5px;vertical-align:1px}
+.dot.off{background:#ffb44d}
+.hbtn{margin-left:auto;background:#fff2;color:#fff;border:0;border-radius:20px;padding:0 14px;height:40px;font:600 14px Figtree,sans-serif;cursor:pointer;white-space:nowrap}
+.hbtn:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.demo{background:light-dark(#fff3d6,#3a2f12);color:light-dark(#6b4b00,#ffd98a);font-size:13px;padding:7px 14px;border-bottom:1px solid var(--line)}
+#log>*{flex:none}
+#log{flex:1;overflow-y:auto;padding:16px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:86%;padding:9px 12px 7px;border-radius:14px;background:var(--paper);box-shadow:0 1px 0 #0001;white-space:pre-line;overflow-wrap:anywhere;animation:in .18s ease-out}
+.msg.me{align-self:flex-end;background:var(--me);border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;border-bottom-left-radius:4px}
+.msg small{display:block;text-align:right;font-size:11px;color:var(--mut);margin-top:2px}
+.msg b{font-weight:700}
+@keyframes in{from{opacity:0;transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){.msg{animation:none}}
+.ticket{align-self:flex-start;width:min(100%,400px);background:var(--paper);border-radius:12px;border:1px solid var(--line);overflow:hidden}
+.ticket .top{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;background:light-dark(#f5f1ea,#232d30);border-bottom:1px dashed var(--line)}
+.ticket .top span{font-size:13px;color:var(--mut)}
+.ticket .top strong{font-size:20px;letter-spacing:.5px}
+.ticket dl{margin:0;padding:8px 14px 12px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.ticket dt{color:var(--mut);font-size:13px;padding-top:2px}
+.ticket dd{margin:0;font-weight:600}
+.ticket dd em{font-style:normal;color:var(--mut);font-weight:500}
+.ticket .hl{color:var(--accd)}
+.typing{align-self:flex-start;background:var(--paper);border-radius:14px;padding:10px 14px;display:flex;gap:4px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--mut);animation:b 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes b{50%{opacity:.3}}
+.opts{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0 2px;align-self:flex-start;max-width:100%}
+.opts button{min-height:44px;padding:8px 16px;border-radius:22px;border:2px solid var(--acc);background:var(--paper);color:var(--accd);font:600 15px Figtree,sans-serif;cursor:pointer;text-align:left}
+.opts button:hover{background:light-dark(#fff0ec,#2b2220)}
+.opts{flex-direction:column;align-items:stretch;width:min(100%,360px)}
+.opts button{display:flex;align-items:center;gap:10px}
+.opts button span{flex:none;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:800}
+form{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+form input{flex:1;height:48px;border-radius:24px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:0 18px;font:16px Figtree,sans-serif}
+form button{width:48px;height:48px;flex:none;border-radius:50%;border:0;background:var(--head);color:#fff;cursor:pointer;display:grid;place-items:center}
+form button:disabled,form input:disabled{opacity:.5}
+/* painel */
+#painel{position:fixed;inset:0;background:var(--bg);overflow-y:auto;display:none;z-index:5}
+#painel.on{display:block}
+.pin{max-width:900px;margin:0 auto;padding:16px max(4vw,14px) 40px}
+.pin h2{font-size:24px;line-height:1.1;margin:8px 0 4px}
+.pin p{color:var(--mut);margin:0 0 14px}
+.pbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.pbar button{min-height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:600 14px Figtree,sans-serif;cursor:pointer}
+.pbar .pri{background:var(--head);color:#fff;border-color:var(--head)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.kpi{background:var(--paper);border-radius:12px;padding:10px 12px;border:1px solid var(--line)}
+.kpi b{display:block;font-size:28px;line-height:1.1}
+.kpi span{font-size:13px;color:var(--mut)}
+@media(max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+table{width:100%;border-collapse:collapse;background:var(--paper);border-radius:12px;overflow:hidden;font-size:14px}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mut);font-weight:600;background:light-dark(#f5f1ea,#232d30)}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:700;white-space:nowrap}
+.tag.ok{background:light-dark(#dff3e8,#1c3a2b);color:var(--ok)}.tag.no{background:light-dark(#ffe9e2,#3e231c);color:var(--accd)}.tag.wa{background:light-dark(#fff1d6,#3a2f12);color:var(--warn)}
+pre{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;white-space:pre-wrap;font:14px/1.5 Figtree,sans-serif;margin:0}
+.empty{background:var(--paper);border-radius:12px;padding:22px;text-align:center;color:var(--mut)}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 10px;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut)}.stack td:empty{display:none}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 26 26"><rect x="2" y="7" width="13" height="10" rx="1.5" fill="#fff"/><path d="M15 10h5l3.5 4v3H15z" fill="#fff" opacity=".8"/><circle cx="7" cy="19" r="2.6" fill="#ef5b3b" stroke="#0f4c4a" stroke-width="1.4"/><circle cx="19" cy="19" r="2.6" fill="#ef5b3b" stroke="#0f4c4a" stroke-width="1.4"/></svg>
+    </div>
+    <div>
+      <h1>Central de Mapas</h1>
+      <p id="status"><span class="dot"></span>Atendimento automático · 7h às 17h</p>
+    </div>
+    <button class="hbtn" id="abrirPainel" type="button" hidden>Solicitações (0)</button>
+  </header>
+  <div class="demo" id="demoBar" hidden>Modo teste: usando o Xadrez de 13/11 e o 03.11.20. Nada é enviado.</div>
+  <div id="log" aria-live="polite"></div>
+  <form id="f" autocomplete="off">
+    <input id="t" placeholder="Digite sua resposta…" aria-label="Sua resposta" enterkeyhint="send">
+    <button aria-label="Enviar"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 20.5 21 12 3 3.5l2.5 7L15 12l-9.5 1.5z" fill="currentColor"/></svg></button>
+  </form>
+</div>
+
+<section id="painel" aria-label="Painel de solicitações">
+  <div class="pin">
+    <div class="pbar"><button class="pri" id="fecharPainel" type="button">← Voltar ao chat</button><button id="copiar" type="button">Copiar resumo</button><button id="limpar" type="button">Apagar testes</button></div>
+    <h2>Solicitações do dia</h2>
+    <p>É isso que cai na aba SOLICITAÇÕES da planilha e no resumo das 9h e das 17h.</p>
+    <div class="kpis" id="kpis"></div>
+    <div id="tabela"></div>
+    <h2 style="font-size:20px;margin-top:22px">Prévia do resumo por e-mail</h2>
+    <p>Texto que chega para você no horário marcado.</p>
+    <pre id="resumo"></pre>
+  </div>
+</section>
+
+<script>
+{
+const CFG = { API_URL: 'https://script.google.com/macros/s/AKfycbx4ksVhkBvQSUnBna3cLn6Up8Cb95G47dcXEDY4_Rel-T2eS2DOYx_UfcLHxuNw4hrtUQ/exec', HORA_INI: 7, HORA_FIM: 17 };
+const DEMO = /*__DEMO__*/null;
+const isDemo = !!DEMO;
+
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const STOP = new Set(['DA','DE','DO','DAS','DOS','E']);
+const toks = s => norm(s).split(' ').filter(w => w.length > 1 && !STOP.has(w));
+const hhmm = d => d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(){ try { return JSON.parse(localStorage.getItem('cm_sol')||'[]'); } catch(e){ return []; } },
+  set(v){ try { localStorage.setItem('cm_sol', JSON.stringify(v)); } catch(e){} }
+};
+let memoria = store.get();
+
+function nomeConfere(digitado, cadastro){
+  const a = toks(digitado), b = toks(cadastro);
+  if (!a.length || !b.length) return false;
+  const tem = w => b.some(x => x === w || (x.length >= 3 && w.startsWith(x)) || (w.length >= 3 && x.startsWith(w)));
+  const n = a.filter(tem).length;
+  return (a[0] === b[0] && n >= 1) || n >= 2;
+}
+
+const FASES = {
+  'GERADO':['Mapa gerado','ainda não foi emitido'],
+  'EMITIDO':['Mapa emitido','aguardando montagem da carga'],
+  'CARGA MONTADA':['Carga montada','aguardando conferência'],
+  'CARGA CONFERIDA':['Carga conferida','pronto para carregar'],
+  'CARREGADO':['Carregado','caminhão carregado, aguardando saída'],
+  'SAIDA CDD FAB':['Saiu para entrega','está na rua'],
+  'ENTRADA CDD FAB':['Voltou da rota','aguardando prestação de contas'],
+  'PC FISICA':['Prestação de contas física feita','falta a financeira'],
+  'PC FINANCEIRA':['Mapa fechado','prestação de contas financeira concluída'],
+  'NAO GERA CARREGAMENTO':['Não gera carregamento','mapa sem carga física']
+};
+
+/* ---------- acesso aos dados (teste local ou Apps Script) ---------- */
+const local = {
+  linhasDoDia(){ return DEMO.xadrez; },
+  pessoa({funcao, codigo, nome}){
+    const c = String(+codigo);
+    const rows = this.linhasDoDia().filter(r => funcao === 'Motorista' ? r.mc === c : (r.a1c === c || r.a2c === c));
+    if (!rows.length) return { ok:false, motivo:'nao_escalado', data: DEMO.data };
+    const r = rows[0];
+    const cad = funcao === 'Motorista' ? r.mn : (r.a1c === c ? r.a1n : r.a2n);
+    if (nome && !nomeConfere(nome, cad)) return { ok:false, motivo:'nao_confere', data: DEMO.data };
+    return { ok:true, nome: cad, data: DEMO.data, equipes: rows.map(eq) };
+  },
+  motorista({q}){
+    const qn = norm(q), c = /^\d+$/.test(qn) ? String(+qn) : null;
+    const rows = this.linhasDoDia().filter(r => c ? r.mc === c : nomeConfere(q, r.mn));
+    return rows.length ? { ok:true, equipes: rows.map(eq) } : { ok:false };
+  },
+  mapa({mapa}){
+    const k = String(+mapa), f = DEMO.mapas[k];
+    if (!f) return { ok:false };
+    const pc = norm(f.f) === 'PC FINANCEIRA';
+    const r = this.linhasDoDia().find(x => x.mapa === k);
+    return { ok:true, mapa:k, fase:f.f, emissao:f.e || '', pcFinanceira:pc, mot: r ? r.mc : '',
+             caixas: f.cx == null ? null : f.cx, caixasArred: f.cx == null ? null : Math.ceil(f.cx - 1e-9) };
+  },
+  nome({funcao, q}){
+    const pessoas = {};
+    this.linhasDoDia().forEach(r => {
+      if (funcao === 'Motorista') pessoas[r.mc] = r.mn;
+      else { if (r.a1c) pessoas[r.a1c] = r.a1n; if (r.a2c) pessoas[r.a2c] = r.a2n; }
+    });
+    const a = toks(q); let best = null, tie = false;
+    Object.entries(pessoas).forEach(([c, n]) => {
+      const b = toks(n), k = a.filter(w => b.some(y => y === w || (y.length >= 3 && w.startsWith(y)) || (w.length >= 3 && y.startsWith(w)))).length;
+      if (!k) return;
+      const pts = k * 10 + (a[0] === b[0] ? 5 : 0);
+      if (!best || pts > best.pts){ best = { c, n, pts, k }; tie = false; } else if (pts === best.pts) tie = true;
+    });
+    if (!best || tie || !(best.k >= 2 || (a.length === 1 && best.pts >= 15))) return { ok:false };
+    return { ok:true, c: best.c, n: best.n };
+  },
+  salvar(reg){
+    const n = memoria.length + 1;
+    reg.protocolo = 'SOL-' + reg.data.slice(0,5).replace('/','') + '-' + String(n).padStart(3,'0');
+    memoria.push(reg); store.set(memoria);
+    return { ok:true, protocolo: reg.protocolo };
+  }
+};
+function eq(r){ return { mapa:r.mapa, placa:r.placa, mot:{c:r.mc,n:r.mn}, a1:{c:r.a1c,n:r.a1n}, a2:{c:r.a2c,n:r.a2n} }; }
+
+async function api(acao, p){
+  if (isDemo) { await sleep(250); return local[acao](p); }
+  if (!/^https:\/\//.test(CFG.API_URL)) return { ok:false, erro:'config' };
+  const url = CFG.API_URL + '?acao=' + encodeURIComponent(acao) + '&p=' + encodeURIComponent(JSON.stringify(p));
+  try { const r = await fetch(url); return await r.json(); }
+  catch(e){ return { ok:false, erro:'rede' }; }
+}
+
+/* ---------- interface do chat ---------- */
+const log = $('#log'), inp = $('#t');
+let opcoes = null;
+function rolar(){ log.scrollTop = log.scrollHeight; }
+function balao(html, quem){
+  const d = document.createElement('div');
+  d.className = 'msg ' + quem;
+  d.innerHTML = html + '<small>' + hhmm(new Date()) + '</small>';
+  log.appendChild(d); rolar(); return d;
+}
+async function bot(html, espera = 450){
+  const t = document.createElement('div'); t.className = 'typing'; t.innerHTML = '<i></i><i></i><i></i>';
+  log.appendChild(t); rolar(); await sleep(espera); t.remove();
+  balao(html, 'bot');
+}
+function cartao(e, destaque){
+  const p = x => x && x.n ? esc(x.n) + ' <em>· ' + esc(x.c) + '</em>' : '<em>—</em>';
+  const cls = k => destaque === k ? ' class="hl"' : '';
+  const d = document.createElement('div'); d.className = 'ticket';
+  d.innerHTML = `<div class="top"><div><span>Mapa</span><br><strong>${esc(e.mapa)}</strong></div><div style="text-align:right"><span>Placa</span><br><strong>${esc(e.placa||'—')}</strong></div></div>
+  <dl><dt>Motorista</dt><dd${cls('mot')}>${p(e.mot)}</dd><dt>Ajudante 1</dt><dd${cls('a1')}>${p(e.a1)}</dd><dt>Ajudante 2</dt><dd${cls('a2')}>${p(e.a2)}</dd></dl>`;
+  log.appendChild(d); rolar();
+}
+function mostrarOpcoes(lista){
+  opcoes = lista;
+  const d = document.createElement('div'); d.className = 'opts';
+  lista.forEach((o, i) => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = '<span>' + (i+1) + '</span>' + esc(o);
+    b.onclick = () => responder(o);
+    d.appendChild(b);
+  });
+  log.appendChild(d); rolar();
+}
+function limparOpcoes(){ document.querySelectorAll('.opts').forEach(o => o.remove()); }
+
+$('#f').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const v = inp.value.trim(); if (!v) return;
+  inp.value = '';
+  if (opcoes && /^\d+$/.test(v) && +v >= 1 && +v <= opcoes.length) return responder(opcoes[+v-1]);
+  responder(v);
+});
+
+let ocupado = false;
+async function responder(txt){
+  if (ocupado) return;
+  ocupado = true; inp.disabled = true;
+  limparOpcoes(); const ops = opcoes; opcoes = null;
+  balao(esc(txt), 'me');
+  try { await passo(txt, ops); } finally { ocupado = false; inp.disabled = false; inp.focus(); }
+}
+
+/* ---------- fluxo da conversa ---------- */
+let S, R;
+function novo(){
+  S = { etapa:'funcao', tentativas:0, eq:null, pessoa:null };
+  R = { funcao:'', nomeDigitado:'', codigo:'', nome:'', identificado:'NÃO', equipeConfere:'', mapa:'', placa:'',
+        motoristaEquipe:'', correcao:'', corrMotorista:'', corrAj1:'', corrAj2:'', tipo:'', faseMapa:'', emissao:'',
+        caixasSistema:'', caixas:'', alerta:'', eqMot:'', eqAj1:'', eqAj2:'', dataInformada:'', descricao:'', foraHorario:false };
+}
+function agora(){ return new Date(); }
+function dentroHorario(d = agora()){ const h = d.getHours() + d.getMinutes()/60; return h >= CFG.HORA_INI && h < CFG.HORA_FIM; }
+function atualizaStatus(){
+  const on = dentroHorario();
+  $('#status').innerHTML = `<span class="dot${on?'':' off'}"></span>` + (on ? 'Online · 7h às 17h' : 'Fora do horário · 7h às 17h');
+}
+
+async function inicio(primeira){
+  novo();
+  if (primeira) await bot('Olá! 👋 Aqui é a <b>Central de Mapas</b>.\nVou te ajudar a registrar sua solicitação.', 300);
+  if (!dentroHorario()){
+    R.foraHorario = true;
+    await bot('⏰ Agora estamos <b>fora do horário</b> (7h às 17h). Pode registrar mesmo assim: a solicitação fica salva e é vista a partir das 7h.');
+  }
+  await bot('Você é <b>motorista</b> ou <b>ajudante</b>?\nToque na opção 👇');
+  mostrarOpcoes(['Motorista','Ajudante']);
+}
+
+const TIPOS = ['Mapa faltando / não apareceu','Caixa zerada no mapa','Correção de equipe no mapa','Ver situação de um mapa','Outro assunto'];
+const SEM = ['Não tinha ajudante'];
+const fmtCx = v => String(v).replace('.', ',');
+const pedirMapa = 'Qual é o <b>número do mapa</b>?';
+
+/* confere o nome digitado na base (0102.47 / 0102.48) e devolve o nome oficial */
+async function conferir(txt, funcao){
+  if (norm(txt) === norm(SEM[0])) return '';
+  const r = await api('nome', { funcao, q: txt });
+  if (r && r.ok){ await bot(`✅ <b>${esc(r.n)}</b> · ${esc(r.c)}`, 250); return r.n; }
+  await bot('Não achei esse nome na base. Vou anotar do jeito que você escreveu. 📝', 250);
+  return txt.trim();
+}
+const mapaOk = m => m.length >= 5;
+
+function lerData(txt){
+  const t = norm(txt), d = agora();
+  if (t === 'HOJE') return d.toLocaleDateString('pt-BR');
+  if (t === 'ONTEM'){ d.setDate(d.getDate() - 1); return d.toLocaleDateString('pt-BR'); }
+  const m = String(txt).match(/(\d{1,2})\D+(\d{1,2})(?:\D+(\d{2,4}))?/);
+  if (!m) return '';
+  const dd = +m[1], mm = +m[2]; let aa = m[3] ? +m[3] : d.getFullYear();
+  if (aa < 100) aa += 2000;
+  if (dd < 1 || dd > 31 || mm < 1 || mm > 12) return '';
+  return String(dd).padStart(2,'0') + '/' + String(mm).padStart(2,'0') + '/' + aa;
+}
+
+/* sugestões de um toque, a partir da equipe confirmada no Xadrez */
+function sugMot(){ return R.equipeConfere === 'SIM' && S.eq ? [S.eq.mot.n] : (R.eqMot ? [R.eqMot] : []); }
+function sugAj(n){
+  const v = R.equipeConfere === 'SIM' && S.eq ? (n === 1 ? S.eq.a1.n : S.eq.a2.n) : (n === 1 ? R.eqAj1 : R.eqAj2);
+  return v ? [v, ...SEM] : SEM;
+}
+
+async function perguntarTipo(txt){
+  await bot(txt || 'Qual é a sua <b>solicitação</b>?');
+  S.etapa = 'tipo';
+  return mostrarOpcoes(TIPOS);
+}
+
+async function semCadastro(){
+  R.identificado = 'NÃO';
+  S.etapa = 'nomeLivre';
+  return bot('Me diz o seu <b>nome completo</b>, por favor.');
+}
+
+async function pedirEquipe(intro){
+  S.etapa = 'eqMot';
+  return bot((intro ? intro + '\n' : '') + 'Qual é o <b>motorista</b> da sua equipe hoje?');
+}
+
+async function passo(txt, ops){
+  switch (S.etapa){
+
+  /* ----- identificação ----- */
+  case 'funcao': {
+    const t = norm(txt);
+    if (t.startsWith('MOT')) R.funcao = 'Motorista';
+    else if (t.startsWith('AJU')) R.funcao = 'Ajudante';
+    else { await bot('Toque em uma das opções ou digite <b>1</b> ou <b>2</b>:'); return mostrarOpcoes(['Motorista','Ajudante']); }
+    S.etapa = 'codigo';
+    return bot('Qual é o <b>código da sua variável</b>?');
+  }
+  case 'codigo': {
+    const c = txt.replace(/\D/g,'');
+    if (!c){ return bot('Digite só o <b>código da variável</b>. Ex.: <b>333</b>'); }
+    R.codigo = String(+c);
+    const r = await api('pessoa', { funcao:R.funcao, codigo:R.codigo, nome:R.nomeDigitado });
+    if (r.erro === 'config'){ return bot('⚙️ Este site ainda não está ligado à planilha.\nFalta colocar o link do Apps Script no index.html (passo 3 do LEIA-ME).'); }
+    if (r.erro){ return bot('⚠️ Não consegui consultar agora. Manda o código de novo em instantes.'); }
+    if (r.ok){
+      S.pessoa = r; R.nome = r.nome;
+      S.etapa = 'confirma';
+      await bot(`Encontrei! Você é <b>${esc(r.nome)}</b>, ${R.funcao.toLowerCase()}, código <b>${esc(R.codigo)}</b>?`);
+      return mostrarOpcoes(['Sim, sou eu','Não sou eu']);
+    }
+    if (r.motivo === 'nao_confere'){
+      await bot('Seu nome e esse código não conferem na escala de hoje. Vou registrar com o que você me passou. 📝');
+      R.nome = R.nomeDigitado; R.identificado = 'NÃO';
+      return pedirEquipe();
+    }
+    await bot(`Não achei ${R.funcao === 'Motorista' ? 'motorista' : 'ajudante'} com o código <b>${esc(R.codigo)}</b> na escala de <b>${esc(r.data || 'hoje')}</b>.`);
+    if (!R.nomeDigitado) return semCadastro();
+    R.nome = R.nomeDigitado; R.identificado = 'NÃO';
+    return pedirEquipe('Sem problema, vou registrar assim mesmo.');
+  }
+  case 'confirma': {
+    if (norm(txt).startsWith('SIM')){
+      R.identificado = 'SIM';
+      const eqs = S.pessoa.equipes;
+      await bot(eqs.length > 1 ? `Hoje (${esc(S.pessoa.data)}) você aparece em <b>${eqs.length} mapas</b> no Xadrez:` : `Sua equipe de hoje (${esc(S.pessoa.data)}) no Xadrez:`);
+      eqs.forEach(e => cartao(e, R.funcao === 'Motorista' ? 'mot' : (e.a1.c === R.codigo ? 'a1' : 'a2')));
+      S.eq = eqs[0];
+      R.mapa = eqs.map(e => e.mapa).join(', '); R.placa = S.eq.placa; R.motoristaEquipe = S.eq.mot.n + ' (' + S.eq.mot.c + ')';
+      S.etapa = 'equipe';
+      await bot('Essa equipe está <b>certa</b>?');
+      return mostrarOpcoes(['Sim, está certa','Não, está errada']);
+    }
+    // não é a pessoa: pede o nome e o código de novo, e aí exige que os dois batam
+    S.tentativas++;
+    if (S.tentativas >= 2) return semCadastro();
+    S.etapa = 'nomeConferir';
+    return bot('Sem problema. Qual é o seu <b>nome completo</b>?');
+  }
+  case 'nomeConferir': {
+    if (toks(txt).length < 2) return bot('Me manda o <b>nome e sobrenome</b>, por favor.');
+    R.nomeDigitado = txt.trim();
+    S.etapa = 'codigo';
+    return bot('Agora confirma o <b>código da sua variável</b>:');
+  }
+  case 'nomeLivre': {
+    if (toks(txt).length < 2) return bot('Me manda o <b>nome e sobrenome</b>, por favor.');
+    R.nomeDigitado = R.nome = txt.trim();
+    return pedirEquipe('Obrigado! Agora me passa a sua equipe.');
+  }
+  case 'equipe': {
+    if (norm(txt).startsWith('SIM')){
+      R.equipeConfere = 'SIM';
+      return perguntarTipo('Ótimo! ✅ Qual é a sua <b>solicitação</b>?');
+    }
+    R.equipeConfere = 'NÃO';
+    return pedirEquipe('Então me informa a sua <b>equipe de verdade</b> hoje.');
+  }
+
+  /* ----- equipe informada (quando o Xadrez está errado ou a pessoa não foi achada) ----- */
+  case 'eqMot': {
+    R.eqMot = await conferir(txt, 'Motorista');
+    S.etapa = 'eqAj1';
+    await bot('Qual é o <b>ajudante 1</b>?');
+    return mostrarOpcoes(R.funcao === 'Ajudante' ? [R.nome, ...SEM] : SEM);
+  }
+  case 'eqAj1': {
+    R.eqAj1 = await conferir(txt, 'Ajudante');
+    S.etapa = 'eqAj2';
+    await bot('E o <b>ajudante 2</b>?');
+    return mostrarOpcoes(R.funcao === 'Ajudante' && R.eqAj1 !== R.nome ? [R.nome, ...SEM] : SEM);
+  }
+  case 'eqAj2': {
+    R.eqAj2 = await conferir(txt, 'Ajudante');
+    if (R.equipeConfere !== 'SIM') R.equipeConfere = 'NÃO';
+    R.correcao = `Equipe informada: Motorista ${R.eqMot} | Aj.1 ${R.eqAj1 || '—'} | Aj.2 ${R.eqAj2 || '—'}`;
+    return perguntarTipo('Anotado ✅\nAgora, qual é a sua <b>solicitação</b>?');
+  }
+
+  /* ----- menu ----- */
+  case 'tipo': {
+    const t = TIPOS.find(x => norm(x) === norm(txt)) || TIPOS.find(x => norm(x).startsWith(norm(txt).slice(0,5)));
+    if (!t){ await bot('Toque em uma das opções ou digite o número:'); return mostrarOpcoes(TIPOS); }
+    R.tipo = t;
+    if (t === TIPOS[0]){ S.etapa = 'faltaMapa'; return bot(pedirMapa); }
+    if (t === TIPOS[1]){ S.etapa = 'caixaMapa'; await bot('Qual é o <b>número do mapa</b> que está com a caixa zerada?'); if (S.eq) mostrarOpcoes([S.eq.mapa]); return; }
+    if (t === TIPOS[2]){ S.etapa = 'corrMapa'; await bot('Vamos corrigir. Qual é o <b>número do mapa</b>?'); if (S.eq) mostrarOpcoes([S.eq.mapa]); return; }
+    if (t === TIPOS[3]){ S.etapa = 'vsMapa'; return bot(pedirMapa); }
+    S.etapa = 'descricao';
+    return bot('Pode escrever o que você precisa. 👇');
+  }
+
+  /* ----- 1. mapa faltando ----- */
+  case 'faltaMapa': {
+    const m = txt.replace(/\D/g,''); if (!mapaOk(m)) return bot('O número do mapa tem 6 dígitos. Ex.: <b>311522</b>');
+    await mostrarSituacao(m);
+    S.etapa = 'descricao';
+    await bot('Me conta o que está acontecendo com esse mapa. 👇');
+    return mostrarOpcoes(['Sem observação']);
+  }
+
+  /* ----- 2. caixa zerada ----- */
+  case 'caixaMapa': {
+    const m = txt.replace(/\D/g,''); if (!mapaOk(m)) return bot('O número do mapa tem 6 dígitos. Ex.: <b>311522</b>');
+    R.mapa = m;
+    const r = await api('mapa', { mapa:m });
+    if (!r.ok){
+      R.faseMapa = 'NÃO ENCONTRADO';
+      await bot(`Não encontrei o mapa <b>${esc(m)}</b> no sistema (03.11.20). Vou registrar para a sala de mapas verificar.`);
+    } else {
+      R.faseMapa = r.fase; R.emissao = r.emissao || '';
+      if (!r.pcFinanceira){
+        const [tit] = FASES[norm(r.fase)] || [r.fase];
+        await bot(`📦 Mapa <b>${esc(m)}</b> ainda está em <b>${esc(tit)}</b>.\nAs caixas só ficam certas depois que o mapa fecha o <b>PC Financeira</b>. Vou registrar para a sala acompanhar.`);
+      } else if (r.caixas == null){
+        await bot(`📦 Mapa <b>${esc(m)}</b> já fechou o PC Financeira, mas não achei a quantidade de caixas. Vou registrar para a sala verificar.`);
+      } else {
+        R.caixasSistema = fmtCx(r.caixas); R.caixas = r.caixasArred;
+        await bot(`📦 Mapa <b>${esc(m)}</b>${r.emissao ? ' · emissão ' + esc(r.emissao) : ''}\nFechado no financeiro ✅\nCaixas no sistema: ${esc(R.caixasSistema)}\nArredondado: <b>${esc(R.caixas)} caixas</b>`);
+      }
+      if (R.identificado === 'SIM' && S.pessoa && r.mot && !S.pessoa.equipes.some(e => e.mot.c === String(r.mot))){
+        R.alerta = 'Mapa não é da equipe do solicitante no Xadrez';
+        await bot('⚠️ Esse mapa não aparece na sua equipe de hoje no Xadrez. Vou anotar isso na solicitação.');
+      }
+    }
+    S.etapa = 'descricao';
+    await bot('Quer acrescentar alguma <b>observação</b>?');
+    return mostrarOpcoes(['Sem observação']);
+  }
+
+  /* ----- 3. correção de equipe: mapa → motorista → ajudante 1 → ajudante 2 ----- */
+  case 'corrMapa': {
+    const m = txt.replace(/\D/g,''); if (!mapaOk(m)) return bot('O número do mapa tem 6 dígitos. Ex.: <b>311522</b>');
+    R.mapa = m;
+    const r = await api('mapa', { mapa:m });
+    R.faseMapa = r.ok ? r.fase : 'NÃO ENCONTRADO'; R.emissao = r.ok ? (r.emissao || '') : '';
+    if (!r.ok) await bot(`Não achei o mapa <b>${esc(m)}</b> no sistema, mas sigo com a correção. 📝`);
+    S.etapa = 'corrMot';
+    await bot('Qual é o <b>motorista</b> desse mapa?');
+    const s = sugMot(); if (s.length) mostrarOpcoes(s);
+    return;
+  }
+  case 'corrMot': { R.corrMotorista = await conferir(txt, 'Motorista'); S.etapa = 'corrAj1'; await bot('Qual é o <b>ajudante 1</b>?'); return mostrarOpcoes(sugAj(1)); }
+  case 'corrAj1': { R.corrAj1 = await conferir(txt, 'Ajudante'); S.etapa = 'corrAj2'; await bot('E o <b>ajudante 2</b>?'); return mostrarOpcoes(sugAj(2)); }
+  case 'corrAj2': {
+    R.corrAj2 = await conferir(txt, 'Ajudante');
+    R.correcao = (R.eqMot ? `Equipe informada: Motorista ${R.eqMot} | Aj.1 ${R.eqAj1 || '—'} | Aj.2 ${R.eqAj2 || '—'} || ` : '') + `Mapa ${R.mapa}: Motorista ${R.corrMotorista} | Aj.1 ${R.corrAj1 || '—'} | Aj.2 ${R.corrAj2 || '—'}`;
+    await bot(`Confere a correção:\n<b>Mapa ${esc(R.mapa)}</b>${R.emissao ? ' · emissão ' + esc(R.emissao) : ''}\nMotorista: <b>${esc(R.corrMotorista)}</b>\nAjudante 1: <b>${esc(R.corrAj1 || '—')}</b>\nAjudante 2: <b>${esc(R.corrAj2 || '—')}</b>`);
+    S.etapa = 'corrOk';
+    return mostrarOpcoes(['Está certo','Refazer']);
+  }
+  case 'corrOk': {
+    if (norm(txt).startsWith('REF')){ S.etapa = 'corrMapa'; return bot('Vamos de novo. Qual é o <b>número do mapa</b>?'); }
+    S.etapa = 'descricao';
+    await bot('Quer acrescentar alguma <b>observação</b>? (ex.: quem faltou, desde que horas)');
+    return mostrarOpcoes(['Sem observação']);
+  }
+
+  /* ----- 4. ver situação: mapa, motorista, data, ajudante 1, ajudante 2 (todos obrigatórios) ----- */
+  case 'vsMapa': {
+    const m = txt.replace(/\D/g,''); if (!mapaOk(m)) return bot('O número do mapa tem 6 dígitos. Ex.: <b>311522</b>');
+    R.mapa = m; S.etapa = 'vsMot';
+    await bot('Qual é o <b>motorista</b> desse mapa?');
+    const s = sugMot(); if (s.length) mostrarOpcoes(s);
+    return;
+  }
+  case 'vsMot': {
+    if (toks(txt).length < 1) return bot('Preciso do <b>nome do motorista</b>.');
+    R.corrMotorista = await conferir(txt, 'Motorista'); S.etapa = 'vsData';
+    await bot('Qual é a <b>data</b> do mapa? (ex.: 13/11)');
+    return mostrarOpcoes(['Hoje','Ontem']);
+  }
+  case 'vsData': {
+    const d = lerData(txt);
+    if (!d){ await bot('Não entendi a data. Manda assim: <b>13/11</b>'); return mostrarOpcoes(['Hoje','Ontem']); }
+    R.dataInformada = d; S.etapa = 'vsAj1';
+    await bot('Qual é o <b>ajudante 1</b>?');
+    return mostrarOpcoes(sugAj(1));
+  }
+  case 'vsAj1': { R.corrAj1 = await conferir(txt, 'Ajudante'); S.etapa = 'vsAj2'; await bot('E o <b>ajudante 2</b>?'); return mostrarOpcoes(sugAj(2)); }
+  case 'vsAj2': {
+    R.corrAj2 = await conferir(txt, 'Ajudante');
+    R.correcao = R.correcao || '';
+    const r = await mostrarSituacao(R.mapa);
+    if (r && r.ok && r.emissao && R.dataInformada && r.emissao !== R.dataInformada){
+      R.alerta = `Data informada ${R.dataInformada} ≠ emissão ${r.emissao}`;
+      await bot(`⚠️ Você informou <b>${esc(R.dataInformada)}</b>, mas no sistema a emissão desse mapa é <b>${esc(r.emissao)}</b>. Vou anotar.`);
+    }
+    S.etapa = 'maisAlgo';
+    await bot('Quer registrar alguma solicitação sobre esse mapa?');
+    return mostrarOpcoes(['Sim, registrar','Não, era só isso']);
+  }
+  case 'maisAlgo': {
+    if (norm(txt).startsWith('NAO')){ R.descricao = 'Só consulta'; return finalizar(); }
+    S.etapa = 'descricao';
+    return bot('Pode escrever o que você precisa. 👇');
+  }
+
+  case 'descricao': {
+    R.descricao = norm(txt) === 'SEM OBSERVACAO' ? '' : txt.trim();
+    return finalizar();
+  }
+  case 'fim': {
+    return inicio(false);
+  }
+  }
+}
+
+async function mostrarSituacao(m){
+  const r = await api('mapa', { mapa:m });
+  R.mapa = m;
+  if (r.ok){
+    const [tit, sub] = FASES[norm(r.fase)] || [r.fase, ''];
+    R.faseMapa = r.fase; R.emissao = r.emissao || '';
+    await bot(`📦 Mapa <b>${esc(m)}</b>${r.emissao ? ' · emissão ' + esc(r.emissao) : ''}\nSituação: <b>${esc(tit)}</b>${sub ? '\n' + esc(sub) : ''}${r.quando ? '\nÚltima atualização: ' + esc(r.quando) : ''}`);
+  } else {
+    R.faseMapa = 'NÃO ENCONTRADO';
+    await bot(`Não encontrei o mapa <b>${esc(m)}</b> no sistema (03.11.20). Vou registrar para a sala de mapas verificar.`);
+  }
+  return r;
+}
+
+async function finalizar(){
+  const d = agora();
+  const reg = Object.assign({}, R, { data: d.toLocaleDateString('pt-BR'), hora: hhmm(d) });
+  const r = await api('salvar', reg);
+  if (!r.ok){ await bot('⚠️ Não consegui salvar agora. Tenta de novo em alguns minutos ou fala com a sala de mapas.'); S.etapa = 'fim'; return mostrarOpcoes(['Tentar de novo']); }
+  await bot(`✅ <b>Solicitação registrada!</b>\nProtocolo: <b>${esc(r.protocolo)}</b>\n\n${esc(R.nome)} · ${esc(R.funcao)} ${esc(R.codigo)}\n${esc(R.tipo || 'Correção de equipe no mapa')}${R.mapa ? '\nMapa ' + esc(R.mapa) : ''}${R.caixas !== '' ? '\nCaixas: ' + esc(R.caixas) : ''}\n\nA sala de mapas vai analisar. Guarda o protocolo, se precisar falar dela.`);
+  S.etapa = 'fim'; atualizaPainel();
+  mostrarOpcoes(['Nova solicitação']);
+}
+
+/* ---------- painel (só no modo teste) ---------- */
+function linhaResumo(x){
+  return `• ${x.hora} ${x.protocolo} | ${x.nome} (${x.funcao} ${x.codigo}) | ${x.tipo}${x.mapa ? ' | mapa ' + x.mapa : ''}${x.caixas !== '' && x.caixas != null ? ' | caixas ' + x.caixas + ' (sistema ' + x.caixasSistema + ')' : ''}${x.equipeConfere === 'NÃO' ? ' | CORREÇÃO: ' + (x.correcao||'') : ''}${x.alerta ? ' | ⚠ ' + x.alerta : ''}${x.descricao ? ' | "' + x.descricao + '"' : ''}`;
+}
+function atualizaPainel(){
+  if (!isDemo) return;
+  $('#abrirPainel').textContent = 'Solicitações (' + memoria.length + ')';
+  const n = memoria.length, nc = memoria.filter(x => x.equipeConfere === 'NÃO').length,
+        ni = memoria.filter(x => x.identificado !== 'SIM').length, nm = memoria.filter(x => x.faseMapa === 'NÃO ENCONTRADO').length;
+  $('#kpis').innerHTML = [[n,'solicitações'],[nc,'equipe não confere'],[ni,'não identificados'],[nm,'mapa não encontrado']]
+    .map(([v,l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join('');
+  $('#tabela').innerHTML = n ? `<table class="stack"><thead><tr><th>Protocolo</th><th>Hora</th><th>Solicitante</th><th>Pedido</th><th>Mapa</th><th>Equipe</th><th>Observação</th></tr></thead><tbody>${
+    memoria.slice().reverse().map(x => `<tr><td>${esc(x.protocolo)}</td><td>${esc(x.hora)}</td><td>${esc(x.nome)}<br><small>${esc(x.funcao)} · ${esc(x.codigo)} ${x.identificado==='SIM'?'<span class="tag ok">conferido</span>':'<span class="tag wa">não identificado</span>'}</small></td><td>${esc(x.tipo)}</td><td>${esc(x.mapa||'')}${x.faseMapa ? '<br><small>' + esc(x.faseMapa) + '</small>' : ''}${x.caixas !== '' && x.caixas != null ? '<br><b>' + esc(x.caixas) + ' cx</b> <small>(' + esc(x.caixasSistema) + ')</small>' : ''}${x.alerta ? '<br><span class="tag wa">' + esc(x.alerta) + '</span>' : ''}</td><td>${x.equipeConfere==='NÃO'?'<span class="tag no">não confere</span><br><small>'+esc(x.correcao)+'</small>':x.equipeConfere==='SIM'?'<span class="tag ok">ok</span>':''}</td><td>${esc(x.descricao)}</td></tr>`).join('')
+  }</tbody></table>` : '<div class="empty">Nenhuma solicitação ainda. Volta pro chat e faz um teste.</div>';
+  const porTipo = {}; memoria.forEach(x => porTipo[x.tipo] = (porTipo[x.tipo]||0) + 1);
+  $('#resumo').textContent = n ? `Central de Mapas — resumo de ${memoria[0].data}\n\n${n} solicitações · ${nc} com equipe que não confere · ${ni} sem identificação\n\nPor tipo:\n${Object.entries(porTipo).map(([k,v]) => '  ' + k + ': ' + v).join('\n')}\n\nDetalhe:\n${memoria.map(linhaResumo).join('\n')}` : 'Sem solicitações.';
+}
+if (isDemo){
+  $('#demoBar').hidden = false; $('#abrirPainel').hidden = false;
+  $('#abrirPainel').onclick = () => { atualizaPainel(); $('#painel').classList.add('on'); };
+  $('#fecharPainel').onclick = () => $('#painel').classList.remove('on');
+  $('#copiar').onclick = async ev => { try { await navigator.clipboard.writeText($('#resumo').textContent); ev.target.textContent = 'Copiado ✓'; } catch(e){ ev.target.textContent = 'Selecione e copie'; } setTimeout(() => ev.target.textContent = 'Copiar resumo', 1800); };
+  $('#limpar').onclick = () => { memoria = []; store.set(memoria); atualizaPainel(); };
+  atualizaPainel();
+}
+atualizaStatus(); setInterval(atualizaStatus, 60000);
+inicio(true);
+}
+</script>
+</body>
+</html>
